@@ -1,0 +1,7 @@
+absl_py==0.10.0
+ml_collections==0.1.0
+numpy==1.19.5
+pandas==1.2.3
+tensorflow_addons==0.12.1
+tfds_nightly==4.2.0.dev202103160106
+tf_nightly_gpu==2.5.0.dev20210316
