@@ -25,8 +25,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """Utilities for building outcome metrics and losses."""
-from typing import Dict
-from typing import List
+from typing import Dict, List, Optional
 
 import ml_collections
 import tensorflow as tf
@@ -114,24 +113,43 @@ class PearsonCorrelationOnline(tf.keras.metrics.Metric):
   def update_state(self,
                    y_true: tf.Tensor,
                    y_pred: tf.Tensor,
-                   sample_weight: float = None) -> None:
+                   sample_weight: Optional[tf.Tensor] = None) -> None:
     """Update running mean, variance, and covariance sums with new observations.
 
     Args:
       y_true: A tensor containing the ground truth labels.
       y_pred: A tensor containing predicted labels.
-      sample_weight: Unused, but required for metric implementation signatures.
+      sample_weight: A tensor of shape (None, 1) containing weights in {0, 1}
+        used to mask observations.
 
     Raises:
       tf.errors.InvalidArgumentError: On `y_true` and `y_pred` shape mismatch.
       tf.errors.InvalidArgumentError: If input tensors are not shape (None, 1).
+      tf.errors.InvalidArgumentError: If `sample_weight` is not `None` and is
+        not shape (None, 1).
+      tf.errors.InvalidArgumentError: If `sample_weight` is not `None` and
+        contains elements not in {0, 1}.
     """
-    del sample_weight
 
     tf.ensure_shape(y_pred, y_true.shape)
     tf.ensure_shape(y_pred, (None, 1))
     x = tf.cast(y_pred, tf.float32)
     y = tf.cast(y_true, tf.float32)
+
+    if sample_weight is not None:
+      # Ensure that `sample_weight` has the correct shape and only contains
+      # elements in {0, 1}.
+      tf.ensure_shape(sample_weight, (None, 1))
+      sample_weight = tf.cast(sample_weight, 'float32')
+      is_one = tf.math.equal(sample_weight, 1.0)
+      is_zero = tf.math.equal(sample_weight, 0.0)
+      is_one_or_zero = tf.math.logical_or(is_one, is_zero)
+      tf.debugging.assert_equal(is_one_or_zero, True,
+                                'Found `sample_weight` value not in {0, 1}.')
+
+      # Only keep observations that have `sample_weight == 1`.
+      x = tf.boolean_mask(x, is_one)
+      y = tf.boolean_mask(y, is_one)
 
     # Update running count.
     count_new = tf.cast(tf.size(x), tf.float32)
