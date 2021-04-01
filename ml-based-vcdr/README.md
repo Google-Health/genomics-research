@@ -257,6 +257,13 @@ image_id,glaucoma_gradability:UNGRADABLE,glaucoma_gradability:WITH_DIFFICULTY,gl
 'unique_image_id_0',0.004463,0.8257,0.17,0.8584,0.1106,0.02357,0.007484,0.808,0.1862,0.005688,0.3887
 ```
 
+### Performing inference with the model used in Alipanahi et al.
+
+Individuals interested in performing inference on fundus images with the model
+used to generate results in Alipanahi *et al.* for the purposes of scientific
+reproducibility or generalizability of the work should email cym@google.com
+for details.
+
 ## Data analysis and figure generation
 
 The code and analyses used to create figures in the above manuscript are
