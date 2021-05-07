@@ -393,3 +393,9 @@ or more extreme than the observed difference in correlations.
 
 The code used for plotting figures in the manuscript is in the
 [analysis/plotting\_results.ipynb](analysis/plotting_results.ipynb) notebook.
+
+## GWAS summary statistics
+
+* VCDR: [click here (.gz)](https://drive.google.com/file/d/1KjlF9hvAn_g_Lm7D13Su1UD6qJpBIQ2z/view?usp=sharing).
+* Glaucoma referral probability adjusted for VCDR: [click here
+(.gz)](https://drive.google.com/file/d/1cWLVMDFr8ijS-SVSGQKRYFdre72y13WX/view?usp=sharing).
