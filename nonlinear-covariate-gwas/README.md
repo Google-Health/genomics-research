@@ -1,4 +1,4 @@
-# DeepNull: Leveraging non-linear covariate effects to improve power in genetic association tests
+# DeepNull: Modeling non-linear covariate effects improves phenotype prediction and association power
 
 This repository contains code implementing nonlinear covariate modeling to
 increase power in genome-wide association studies, as described in "DeepNull:
