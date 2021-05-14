@@ -17,7 +17,7 @@ setup(
     #
     # $ pip install deepnull
     name='deepnull',
-    version='0.1.1',  # Keep in sync with __init__.__version__.
+    version='0.1.2',  # Keep in sync with __init__.__version__.
     description='Models nonlinear interactions between covariates and phenotypes',
     long_description=long_description,
     long_description_content_type='text/markdown',
@@ -27,5 +27,12 @@ setup(
     packages=['deepnull'],
     package_dir={'deepnull': '.'},
     python_requires='>=3.7, <4',
-    install_requires=[],
+    install_requires=[
+        'wheel>=0.36',
+        'absl-py>=0.12',
+        'numpy>=1.19',
+        'pandas>=1.1',
+        'tensorflow>=2.4.1',
+        'tensorflow-probability>=0.12',
+    ],
 )
