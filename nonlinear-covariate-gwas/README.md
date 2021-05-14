@@ -48,7 +48,7 @@ python -m deepnull.main \
 To see all available flags, run
 
 ```bash
-python -m deepnull.main --help 2> /dev/null`
+python -m deepnull.main --help 2> /dev/null
 ```
 
 ## Data
