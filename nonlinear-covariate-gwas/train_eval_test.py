@@ -194,6 +194,7 @@ class TrainEvalTest(parameterized.TestCase):
     design_df = _create_df(target_is_binary=target_is_binary, size=size)
     design_df['FID'] = np.arange(size)
     design_df['IID'] = np.arange(size)
+    design_df['unused_str_column'] = np.random.choice(list('abcdefg'), size)
 
     input_df = design_df.copy(deep=True)
     with tempfile.TemporaryDirectory() as tmpdir:

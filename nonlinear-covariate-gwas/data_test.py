@@ -164,7 +164,7 @@ class DataTest(parameterized.TestCase):
   def test_write_plink_or_bolt_file(self):
     df = pd.DataFrame(
         {
-            'FID': [1, 2, 3, 4, 5],
+            'FID': ['fam1', 'fam1', 'fam1', 'fam2', 'fam3'],
             'IID': [1, 2, 3, 4, 5],
             'age': [45, 50, 55, 60, 65],
             'sex': [0, 0, 1, 1, 0],
@@ -175,11 +175,11 @@ class DataTest(parameterized.TestCase):
     binary_column_map = {'sex': {0: 1, 1: 2}, 'binary_miss': {0.: 1., 1.: 2.}}
 
     expected = ('FID\tIID\tage\tsex\tbinary_miss\tcont_miss\n'
-                '1\t1\t45\t1\t1\t0.5\n'
-                '2\t2\t50\t1\t2\t1.5\n'
-                '3\t3\t55\t2\t2\t2.5\n'
-                '4\t4\t60\t2\tNA\t3.5\n'
-                '5\t5\t65\t1\t1\tNA\n')
+                'fam1\t1\t45\t1\t1\t0.5\n'
+                'fam1\t2\t50\t1\t2\t1.5\n'
+                'fam1\t3\t55\t2\t2\t2.5\n'
+                'fam2\t4\t60\t2\tNA\t3.5\n'
+                'fam3\t5\t65\t1\t1\tNA\n')
 
     actual = data.write_plink_or_bolt_file(
         df,

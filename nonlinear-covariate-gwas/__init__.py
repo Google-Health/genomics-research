@@ -26,4 +26,4 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """DeepNull."""
 
-__version__ = '0.1.2'
+__version__ = '0.1.3'

@@ -169,11 +169,17 @@ def write_plink_or_bolt_file(input_df: pd.DataFrame,
     for column in df.columns:
       values = df[column]
       mask = ~values.isnull()
-      if (values[mask] == values[mask].astype(int)).all():
-        # All non-null values are integers. Convert to the 'Int64' type that
-        # allows nullable integers. This requires nulls to use the pd.NA value
-        # rather than np.nan.
-        df[column] = values.fillna(pd.NA).astype('Int64')
+      try:
+        int_values = values[mask].astype(int)
+      except ValueError:
+        # This is a non-numeric field, leave it as-is.
+        continue
+      else:
+        if (values[mask] == int_values).all():
+          # All non-null values are integers. Convert to the 'Int64' type that
+          # allows nullable integers. This requires nulls to use the pd.NA value
+          # rather than np.nan.
+          df[column] = values.fillna(pd.NA).astype('Int64')
 
   return df.to_csv(
       path_or_buf, sep='\t', index=False, na_rep=str(missing_value))
