@@ -3,8 +3,9 @@
 This repository contains code implementing nonlinear covariate modeling to
 increase power in genome-wide association studies, as described in "DeepNull:
 Modeling non-linear covariate effects improves phenotype prediction and
-association power" (Hormozdiari et al 2021). The code is written using Python
-3.7 and TensorFlow 2.4.
+association power"
+([Hormozdiari et al 2021](https://doi.org/10.1101/2021.05.26.445783)).
+The code is written using Python 3.7 and TensorFlow 2.4.
 
 ## Installation
 
