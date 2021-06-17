@@ -5,7 +5,7 @@
 This repository contains code developed as part of the following paper:
 
 * ["Large-scale machine learning-based phenotyping significantly improves
-genomic discovery for optic nerve head morphology"](https://arxiv.org/abs/2011.13012) (Alipanahi *et al*., 2021).
+genomic discovery for optic nerve head morphology"](https://doi.org/10.1016/j.ajhg.2021.05.004) (Alipanahi, Hormozdiari, Behsaz, Cosentino, McCaw *et al*., *AJHG*, 2021).
 
 There are three pieces of functionality present in this repository:
 
