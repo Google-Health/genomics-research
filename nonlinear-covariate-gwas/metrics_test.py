@@ -38,11 +38,21 @@ class MetricsTest(parameterized.TestCase):
       dict(metric_name='tf_pearson', values=[0.03, 0.02, 0.04], expected=False),
       dict(metric_name='tf_pearson', values=[0.03, 0.9], expected=False),
       dict(metric_name='tf_pearson', values=[0.8, 0.82, 0.85], expected=True),
+      dict(metric_name='pearson', values=[-0.1], expected=False),
+      dict(metric_name='pearson', values=[-0.1, 1.0], expected=False),
+      dict(metric_name='pearson', values=[0.03, 0.02, 0.04], expected=False),
+      dict(metric_name='pearson', values=[0.03, 0.9], expected=False),
+      dict(metric_name='pearson', values=[0.8, 0.82, 0.85], expected=True),
       dict(metric_name='auroc', values=[-0.1], expected=False),
       dict(metric_name='auroc', values=[-0.1, 1.0], expected=False),
       dict(metric_name='auroc', values=[0.03, 0.02, 0.04], expected=False),
       dict(metric_name='auroc', values=[0.03, 0.9], expected=False),
       dict(metric_name='auroc', values=[0.8, 0.82, 0.85], expected=True),
+      dict(metric_name='auc', values=[-0.1], expected=False),
+      dict(metric_name='auc', values=[-0.1, 1.0], expected=False),
+      dict(metric_name='auc', values=[0.03, 0.02, 0.04], expected=False),
+      dict(metric_name='auc', values=[0.03, 0.9], expected=False),
+      dict(metric_name='auc', values=[0.8, 0.82, 0.85], expected=True),
   )
   def test_acceptable_model_performance(self, metric_name, values, expected):
     """Test identification of acceptable model performance."""

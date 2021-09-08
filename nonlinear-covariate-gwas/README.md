@@ -52,6 +52,72 @@ To see all available flags, run
 python -m deepnull.main --help 2> /dev/null
 ```
 
+Of particular note is the `--model_config` flag. DeepNull uses the
+[ml_collections](https://github.com/google/ml_collections) library to specify
+all parameters related to the model and training regimen. The supported
+configuration code is located in [`config.py`](config.py), and parameters can
+be modified as described in detail in the
+[`ml_collections README`](https://github.com/google/ml_collections#parameterising-the-get_config-function).
+As a brief example, to use the DeepNull architecture with the `elu` activation
+and train with batch size 4096, the above example command would be modified as
+follows:
+
+```bash
+python -m deepnull.main \
+  --input_tsv=/input/ORIGINAL_PHENOCOVAR_TSV \
+  --output_tsv=/output/PHENOCOVAR_WITH_DEEPNULL_PREDICTION_TSV \
+  --target=pheno \
+  --covariates="age,sex,genotyping_array" \
+  --model_config=/path/to/config.py:deepnull \
+  --model_config.model_config.mlp_activation=elu \
+  --model_config.training_config.batch_size=4096
+```
+
+where `/path/to/config.py` provides the path to [`config.py`](config.py) on your
+machine.
+
+## Incorporating DeepNull into a GWAS analysis
+
+The above section, "How to run DeepNull", shows that the DeepNull software adds
+a single column to a phenotype+covariate file of interest that represents a
+nonlinear prediction of the target phenotype of interest. To incorporate this
+into a GWAS analysis, the single additional covariate should be **added** as an
+additional covariate. A concrete example with `BOLT-LMM`, using the same file,
+phenotype `pheno`, and covariates `age`, `sex`, `genotyping_array` as above, is
+shown below:
+
+### Original example GWAS command
+```bash
+# N.B. Data loading flags are omitted for brevity.
+
+bolt \
+  --phenoFile /input/ORIGINAL_PHENOCOVAR_TSV \
+  --covarFile /input/ORIGINAL_PHENOCOVAR_TSV \
+  --qCovarCol age \
+  --qCovarCol sex \
+  --qCovarCol genotyping_array \
+  --phenoCol pheno
+```
+
+After running DeepNull on the `/input/ORIGINAL_PHENOCOVAR_TSV` to create the new
+TSV `/output/PHENOCOVAR_WITH_DEEPNULL_PREDICTION_TSV` that includes the column
+`pheno_deepnull`, the updated command is given below:
+
+### Updated GWAS command to incorporate DeepNull
+```bash
+# N.B. Data loading flags are omitted for brevity.
+# Note the addition of the single `--qCovarCol pheno_deepnull` line.
+
+bolt \
+  --phenoFile /output/PHENOCOVAR_WITH_DEEPNULL_PREDICTION_TSV \
+  --covarFile /output/PHENOCOVAR_WITH_DEEPNULL_PREDICTION_TSV \
+  --qCovarCol age \
+  --qCovarCol sex \
+  --qCovarCol genotyping_array \
+  --qCovarCol pheno_deepnull \
+  --phenoCol pheno
+```
+
 ## Data
 
 Datasets used to reproduce the results from the above publication are available

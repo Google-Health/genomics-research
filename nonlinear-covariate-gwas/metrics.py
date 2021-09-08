@@ -25,8 +25,8 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """Library of metrics and analysis of metrics."""
-from typing import Any, Callable, Dict, List, Union
 import dataclasses
+from typing import Any, Callable, Dict, List, Tuple, Union
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -49,14 +49,52 @@ def tf_pearson(y_true: tf.Tensor, y_pred: tf.Tensor):
   return tfp.stats.correlation(y_pred, y_true)
 
 
-def acceptable_model_performance(eval_metrics: List[Dict[str, float]]) -> bool:
-  """Returns True if and only if performance across folds is acceptable."""
-  if 'tf_pearson' in eval_metrics[0]:
-    key = 'tf_pearson'
-    name = 'correlation'
+def _get_metric_key_name(metrics_dict: Dict[str, float]) -> Tuple[str, str]:
+  """Returns the key and associated text name to use for eval metrics.
+
+  This function is used to identify what metric should be used to assess model
+  performance across data folds. It is needed because different model types
+  (e.g. TF vs XGBoost) sometimes use different names for the same evaluation
+  metric (e.g. the area under the receiver operating characteristic curve is
+  called 'auroc' for Keras metrics, but 'auc' for XGBoost).
+
+  Args:
+    metrics_dict: An example metrics dictionary.
+
+  Returns:
+    A tuple of the dictionary key that should be used to select the metric of
+    interest and the corresponding text name of the metric.
+  """
+  if 'tf_pearson' in metrics_dict:
+    # TensorFlow metric for a quantitative phenotype.
+    return 'tf_pearson', 'correlation'
+  elif 'pearson' in metrics_dict:
+    # XGBoost metric for a quantitative phenotype.
+    return 'pearson', 'correlation'
+  elif 'auroc' in metrics_dict:
+    # TensorFlow metric for a binary phenotype.
+    return 'auroc', 'AUROC'
+  elif 'auc' in metrics_dict:
+    # XGBoost metric for a binary phenotype.
+    return 'auc', 'AUROC'
   else:
-    key = 'auroc'
-    name = 'AUROC'
+    raise ValueError('Unable to find metric to assess model performance: '
+                     f'{metrics_dict}')
+
+
+def acceptable_model_performance(eval_metrics: List[Dict[str, float]]) -> bool:
+  """Returns True if and only if performance across folds is acceptable.
+
+  Args:
+    eval_metrics: A list of metrics computed on the eval set for multiple data
+      folds. `eval_metrics[i]` contains the metrics for data fold `i`, and each
+      fold is expected to contain identical keys.
+
+  Returns:
+    True if and only if the heuristics for model training being consistent
+    across data folds are satisfactorily passed.
+  """
+  key, name = _get_metric_key_name(eval_metrics[0])
 
   values = sorted([d[key] for d in eval_metrics])
   if values[0] <= 0:
@@ -69,7 +107,7 @@ def acceptable_model_performance(eval_metrics: List[Dict[str, float]]) -> bool:
 
   delta = (values[-1] - values[0]) / values[0]
   if delta > 0.1:
-    print('Performance gap between folds > 10%: ', values)
+    print(f'Performance gap in {name} between folds > 10%: ', values)
     return False
 
   return True

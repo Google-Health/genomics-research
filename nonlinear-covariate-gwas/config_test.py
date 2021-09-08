@@ -24,6 +24,23 @@
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-"""DeepNull."""
+"""Tests for deepnull.config."""
+from absl.testing import absltest
+from deepnull import config
 
-__version__ = '0.2.0'
+
+class ConfigTest(absltest.TestCase):
+
+  def test_supported_model(self):
+    valid_config = config.get_config(config.DEEPNULL)
+    self.assertEqual(valid_config.model_type, config.DEEPNULL)
+
+  def test_unsupported_model(self):
+    bad = 'unsupported_model'
+    with self.assertRaisesRegex(ValueError,
+                                f'Config "{bad}" is not a supported model'):
+      config.get_config(bad)
+
+
+if __name__ == '__main__':
+  absltest.main()

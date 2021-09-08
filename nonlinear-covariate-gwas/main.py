@@ -30,11 +30,12 @@ from typing import Sequence
 from absl import app
 from absl import flags
 from absl import logging
-import tensorflow as tf
+from deepnull import config
 from deepnull import data
 from deepnull import metrics
-from deepnull import model as model_lib
 from deepnull import train_eval
+from ml_collections.config_flags import config_flags
+import tensorflow as tf
 
 _INPUT_TSV = flags.DEFINE_string('input_tsv', None,
                                  'Path to input PLINK/BOLT-formatted TSV')
@@ -52,13 +53,15 @@ _PREDS_COL = flags.DEFINE_string(
     'the target column name with "_deepnull" suffix added.')
 _NUM_FOLDS = flags.DEFINE_integer(
     'num_folds', 5, 'The number of cross-validation folds to use.')
-_NUM_EPOCHS = flags.DEFINE_integer(
-    'num_epochs', None, 'The number of epochs to train each model fold.')
 _SEED = flags.DEFINE_integer('seed', None, 'Random seed to use.')
 _LOGDIR = flags.DEFINE_string('logdir', '/tmp',
                               'Directory in which to write temporary outputs.')
 _VERBOSE = flags.DEFINE_boolean(
     'verbose', False, 'If True, prints verbose model training output.')
+_MODEL_CONFIG = config_flags.DEFINE_config_file(
+    'model_config', None,
+    'Specifies the model config file to use. If unspecified, defaults to the '
+    'MLP-based TF model used for all main results of the DeepNull paper.')
 
 
 def main(argv: Sequence[str]) -> None:
@@ -70,21 +73,21 @@ def main(argv: Sequence[str]) -> None:
   input_df, binary_col_map = data.load_plink_or_bolt_file(
       path_or_buf=_INPUT_TSV.value, missing_value=_MISSING_VALUE.value)
 
-  if _NUM_EPOCHS.value is None:
-    model_params = model_lib.ModelParameters()
+  if _MODEL_CONFIG.value is None:
+    full_config = config.get_config('deepnull')
   else:
-    model_params = model_lib.ModelParameters(num_epochs=_NUM_EPOCHS.value)
+    full_config = _MODEL_CONFIG.value
 
   logging.info('Training DeepNull model on %s with model %s', _TARGET.value,
-               model_params)
-  final_df, _, eval_metrics, _ = train_eval.create_deepnull_prediction(
+               full_config)
+  final_df, eval_metrics, _ = train_eval.create_deepnull_prediction(
       input_df=input_df,
       target=_TARGET.value,
       target_is_binary=_TARGET.value in binary_col_map,
       covariates=_COVARIATES.value,
+      full_config=full_config,
       prediction_column=_PREDS_COL.value,
       num_folds=_NUM_FOLDS.value,
-      model_params=model_params,
       seed=_SEED.value,
       logdir=_LOGDIR.value,
       # Level 2 is printing once per epoch during training.

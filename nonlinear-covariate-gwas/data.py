@@ -32,6 +32,9 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 
+# Individual ID column.
+IID = 'IID'
+
 
 def _missing_to_nan(data: pd.Series,
                     input_missing_value: Union[str, int, float]) -> pd.Series:
@@ -96,14 +99,15 @@ def load_plink_or_bolt_file(
     ValueError: The input is not a properly formatted PLINK or BOLT file.
   """
   df = pd.read_csv(path_or_buf, delimiter='\t')
-  if list(df.columns[:2]) != ['FID', 'IID']:
+  if list(df.columns[:2]) != ['FID', IID]:
     raise ValueError(
         f'"FID" and "IID" required to start PLINK/BOLT file: {df.columns}')
-  if df.IID.isnull().any():
-    raise ValueError(f'"IID" column of {path_or_buf} contains missing data.')
-  if len(df.IID.unique()) != len(df):
-    raise ValueError('"IID" column is not unique: '
-                     f'{len(df.IID.unique())} entries in df of size {len(df)}.')
+  if df[IID].isnull().any():
+    raise ValueError(f'"{IID}" column of {path_or_buf} contains missing data.')
+  if len(df[IID].unique()) != len(df):
+    raise ValueError(
+        f'"{IID}" column is not unique: '
+        f'{len(df[IID].unique())} entries in df of size {len(df)}.')
   invalid_column_chars = {' ', '(', ')', '|'}
   for column in df.columns:
     if set(column) & invalid_column_chars:
@@ -113,7 +117,7 @@ def load_plink_or_bolt_file(
 
   binary_column_map = {}
   for column in df.columns:
-    if column in ['FID', 'IID']:
+    if column in ['FID', IID]:
       continue
     df[column] = _missing_to_nan(df[column], missing_value)
     if is_binary(df[column]):
@@ -155,8 +159,8 @@ def write_plink_or_bolt_file(input_df: pd.DataFrame,
     The result as a string if `path_or_buf` is None, otherwise None.
   """
   # Sanity check.
-  if list(input_df.columns[:2]) != ['FID', 'IID']:
-    raise ValueError('"FID" and "IID" required to start PLINK/BOLT file: '
+  if list(input_df.columns[:2]) != ['FID', IID]:
+    raise ValueError(f'"FID" and "{IID}" required to start PLINK/BOLT file: '
                      f'{input_df.columns}')
 
   # Make a copy since we mutate, then transform binary fields to their original
@@ -189,7 +193,7 @@ def split_data_in_folds(input_df: pd.DataFrame,
                         num_folds: int,
                         seed: Optional[int] = None):
   """Yields (train, eval, test) DataFrames for all `num_folds` data splits."""
-  all_ids = sorted(input_df.IID)
+  all_ids = sorted(input_df[IID])
   random.seed(seed)
   random.shuffle(all_ids)
 
@@ -208,9 +212,9 @@ def split_data_in_folds(input_df: pd.DataFrame,
 
     eval_ids = fold_ids[eval_fold]
     test_ids = fold_ids[test_fold]
-    yield (input_df.loc[input_df.IID.isin(train_ids)],
-           input_df.loc[input_df.IID.isin(eval_ids)],
-           input_df.loc[input_df.IID.isin(test_ids)])
+    yield (input_df.loc[input_df[IID].isin(train_ids)],
+           input_df.loc[input_df[IID].isin(eval_ids)],
+           input_df.loc[input_df[IID].isin(test_ids)])
 
 
 def parse_covariates(covariate_str: str) -> List[str]:
