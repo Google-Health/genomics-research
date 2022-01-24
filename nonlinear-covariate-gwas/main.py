@@ -58,7 +58,11 @@ _LOGDIR = flags.DEFINE_string('logdir', '/tmp',
                               'Directory in which to write temporary outputs.')
 _VERBOSE = flags.DEFINE_boolean(
     'verbose', False, 'If True, prints verbose model training output.')
-_MODEL_CONFIG = config_flags.DEFINE_config_file(
+
+# N.B.: ml_collections v0.1.0 does not return from this function. When an update
+# is released on PyPI, use the same structure as the above flags.
+FLAGS = flags.FLAGS
+config_flags.DEFINE_config_file(
     'model_config', None,
     'Specifies the model config file to use. If unspecified, defaults to the '
     'MLP-based TF model used for all main results of the DeepNull paper.')
@@ -73,10 +77,10 @@ def main(argv: Sequence[str]) -> None:
   input_df, binary_col_map = data.load_plink_or_bolt_file(
       path_or_buf=_INPUT_TSV.value, missing_value=_MISSING_VALUE.value)
 
-  if _MODEL_CONFIG.value is None:
+  if FLAGS.model_config is None:
     full_config = config.get_config('deepnull')
   else:
-    full_config = _MODEL_CONFIG.value
+    full_config = FLAGS.model_config
 
   logging.info('Training DeepNull model on %s with model %s', _TARGET.value,
                full_config)

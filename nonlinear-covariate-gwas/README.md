@@ -24,6 +24,17 @@ on a machine with Python 3.7+. This installs a CPU-only version, as there are
 typically few enough covariates that using accelerators does not provide
 meaningful speedups.
 
+Verify that the installation is working properly by executing all tests:
+
+```bash
+python -m deepnull.config_test
+python -m deepnull.data_test
+python -m deepnull.metrics_test
+python -m deepnull.main_test
+python -m deepnull.model_test
+python -m deepnull.train_eval_test
+```
+
 ## How to run DeepNull
 
 To run locally, there is a single required input file. This file contains the
