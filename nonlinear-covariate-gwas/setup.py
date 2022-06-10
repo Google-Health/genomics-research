@@ -17,7 +17,7 @@ setup(
     #
     # $ pip install deepnull
     name='deepnull',
-    version='0.2.1',  # Keep in sync with __init__.__version__.
+    version='0.2.2',  # Keep in sync with __init__.__version__.
     description='Models nonlinear interactions between covariates and phenotypes',
     long_description=long_description,
     long_description_content_type='text/markdown',
