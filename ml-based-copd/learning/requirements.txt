@@ -1,0 +1,6 @@
+absl-py==1.2
+ml_collections==0.1.1
+numpy==1.23.2
+pandas==1.4.4
+tensorflow_gpu==2.9
+tensorflow_addons==0.17.1
