@@ -129,6 +129,10 @@ bolt \
   --phenoCol pheno
 ```
 
+## Online app
+DeepNull is also available as an app on
+[superbio.ai](https://app.superbio.ai/apps/185?id=6380a2792ffa50c6deecdb2b).
+
 ## Data
 
 Datasets used to reproduce the results from the above publication are available
