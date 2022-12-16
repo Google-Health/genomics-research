@@ -19,6 +19,9 @@ to researchers with approved access to the
 [UK Biobank](https://www.ukbiobank.ac.uk/). The ResNet18 ensemble member
 TensorFlow checkpoints are available
 [here](https://drive.google.com/drive/folders/1XZC9ByHBChDcQtNvS7RM60GqlOPTkocs).
+GWAS summary statistics for the D-INT ML-based COPD liability score are
+available
+[here](https://drive.google.com/file/d/1Kpa64LmSjy_BUbF-a5vzq15OlMVkvrjh/view?usp=share_link).
 
 NOTE: the content of this research code repository (i) is not intended to be a
 medical device; and (ii) is not intended for clinical use of any kind, including
