@@ -21,7 +21,7 @@ TensorFlow checkpoints are available
 [here](https://drive.google.com/drive/folders/1XZC9ByHBChDcQtNvS7RM60GqlOPTkocs).
 GWAS summary statistics for the D-INT ML-based COPD liability score are
 available
-[here](https://drive.google.com/file/d/1Kpa64LmSjy_BUbF-a5vzq15OlMVkvrjh/view?usp=share_link).
+[here](https://github.com/Google-Health/genomics-research/releases/download/v0.1.0-ML-COPD/ml_based_copd.gwas.tsv.gz).
 
 NOTE: the content of this research code repository (i) is not intended to be a
 medical device; and (ii) is not intended for clinical use of any kind, including
