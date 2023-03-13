@@ -22,7 +22,7 @@ each analysis.
 
 Model checkpoints, full ML-based COPD GWAS summary statistics, and annotated
 hits, loci, and filtered results for internal GWAS are attached to the
-[latest release](https://github.com/Google-Health/genomics-research/releases/download/v0.2.0-ML-COPD/).
+[latest release](https://github.com/Google-Health/genomics-research/releases/tag/v0.2.0-ML-COPD).
 
 Important: The code is not intended for active application to spirograms, but
 rather to enable reproducibility of the analyses in the accompanying
