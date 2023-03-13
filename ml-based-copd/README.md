@@ -62,7 +62,7 @@ available
 [here](https://github.com/Google-Health/genomics-research/releases/download/v0.2.0-ML-COPD/ml_based_copd.gwas.tsv.gz).
 Annotated hits, loci, and filtered results for internal GWAS are also attached
 to the
-[latest release](https://github.com/Google-Health/genomics-research/releases/download/v0.2.0-ML-COPD/).
+[latest release](https://github.com/Google-Health/genomics-research/releases/tag/v0.2.0-ML-COPD/).
 
 ## Model training and inference
 
