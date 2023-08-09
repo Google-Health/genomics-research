@@ -1,6 +1,6 @@
 absl_py==0.10.0
 ml_collections==0.1.0
-numpy==1.19.5
+numpy==1.22.0
 pandas==1.2.3
 tensorflow_addons==0.12.1
 tfds_nightly==4.2.0.dev202103160106
