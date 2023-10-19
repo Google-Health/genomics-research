@@ -3,9 +3,9 @@
 ## Overview
 
 This repository contains code developed as part of the following paper:
-“Inference of chronic obstructive pulmonary disease with deep learning on raw
-spirograms identifies novel genetic loci and improves risk models”
-([Cosentino, Behsaz, Alipanahi, McCaw *et al*., 2022](https://www.medrxiv.org/content/10.1101/2022.09.12.22279863v1)).
+“Inference of chronic obstructive pulmonary disease with deep learning
+on raw spirograms identifies new genetic loci and improves risk models”
+([Cosentino, Behsaz, Alipanahi, McCaw *et al*., *Nature Genetics*, 2023](https://www.nature.com/articles/s41588-023-01372-4)).
 
 There are three pieces of functionality present in this repository:
 
