@@ -223,6 +223,12 @@ illustrates the core implementation of the model architectures described in the
 above publication, but omits the code needed to prepare and preprocess input
 data as that is done on internal Google utilities.
 
+See
+[`run_inference_demo.ipynb`](https://github.com/Google-Health/genomics-research/blob/main/ml-based-copd/learning/notebooks/run_inference_demo.ipynb)
+for a demonstration of running inference on the UKB showcase data using the
+ML-based COPD model checkpoints. This notebook can be run on
+[colab.google](https://colab.google).
+
 ## Data analyses and figure generation
 
 Details for running the following analyses are available in
