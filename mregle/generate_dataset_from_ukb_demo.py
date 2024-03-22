@@ -280,7 +280,7 @@ def get_ecg_ppg_ml_dataframe_from_raw_data(
 
 
 def main(unused_argv: Sequence[str]) -> None:
-  input_file = 'data/20205_2_0.xml'
+  input_file = 'data/ukb_ecg_demo_20205_2_0.xml'
   if _INPUT_FILE.value:
     input_file = _INPUT_FILE.value
 
@@ -298,7 +298,7 @@ def main(unused_argv: Sequence[str]) -> None:
     np.save(output_file, ecg_ml_arr)
 
   elif _DATASET.value == 'ecgppg':
-    ppg_raw_data = 'data/eg_stiff_4205.dat'
+    ppg_raw_data = 'data/ukb_ppg_demo_4205.dat'
     if _PPG_INPUT_FILE.value:
       ppg_raw_data = _PPG_INPUT_FILE.value
     ecg_ppg_arr = get_ecg_ppg_ml_dataframe_from_raw_data(
