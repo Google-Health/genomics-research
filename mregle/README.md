@@ -13,7 +13,7 @@ Please cite the above manuscript if you use this repository for your research.
 
 ```
 @article {Zhou2024.03.19.24304547,
-	author = {Yuchen Zhou and Justin T Cosentino and Taedong Yun and Mahantesh I Biradar and Jacqueline Shreibati and Dongbing Lai and Tae-Hwi Schwantes-An and Robert Luben and Zachary R McCaw and Jorgen Engmann and Rui Providencia and Amand Floriaan Schmidt and Patricia B. Munroe and Howard Yang and Andrew Carroll and Anthony P Khawaja and Cory McLean and Babak Behsaz and Farhad Hormozdiari},
+	author = {Yuchen Zhou and Justin T Cosentino and Taedong Yun and Mahantesh I Biradar and Jacqueline Shreibati and Dongbing Lai and Tae-Hwi Schwantes-An and Robert Luben and Zachary R McCaw and Jorgen Engmann and Rui Providencia and Amand Floriaan Schmidt and Patricia B. Munroe and Howard Yang and Andrew Carroll and Anthony P Khawaja and Cory Y McLean and Babak Behsaz and Farhad Hormozdiari},
 	title = {Utilizing multimodal AI to improve genetic analyses of cardiovascular traits},
 	elocation-id = {2024.03.19.24304547},
 	year = {2024},
