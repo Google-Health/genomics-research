@@ -1,0 +1,1067 @@
+From e8b80f7feb1287a851a5e8b608e00494b334a107 Mon Sep 17 00:00:00 2001
+From: Justin Khasentino <justintcosentino@gmail.com>
+Date: Tue, 7 Apr 2026 23:45:36 +0000
+Subject: [PATCH] Generate a patch for the ML-based VCDR Extension manuscript.
+
+---
+ ml-based-vcdr/README.md                       |  29 +--
+ ml-based-vcdr/learning/callback_utils.py      | 191 ++++++++++++++++++
+ ml-based-vcdr/learning/configs/base.py        |   9 +-
+ ml-based-vcdr/learning/configs/base_epicnf.py | 147 ++++++++++++++
+ .../learning/configs/base_ukb_distill.py      | 137 +++++++++++++
+ ml-based-vcdr/learning/input_pipeline.py      |   2 +-
+ ml-based-vcdr/learning/predict.py             |  22 +-
+ ml-based-vcdr/learning/predict_utils.py       | 107 ++++++++--
+ ml-based-vcdr/learning/save_model.py          | 110 ++++++++++
+ ml-based-vcdr/learning/train.py               |  61 +-----
+ 10 files changed, 709 insertions(+), 106 deletions(-)
+ create mode 100644 ml-based-vcdr/learning/callback_utils.py
+ create mode 100644 ml-based-vcdr/learning/configs/base_epicnf.py
+ create mode 100644 ml-based-vcdr/learning/configs/base_ukb_distill.py
+ create mode 100644 ml-based-vcdr/learning/save_model.py
+
+diff --git a/ml-based-vcdr/README.md b/ml-based-vcdr/README.md
+index 1a0fb21..0f70d0b 100644
+--- a/ml-based-vcdr/README.md
++++ b/ml-based-vcdr/README.md
+@@ -4,8 +4,10 @@
+ 
+ This repository contains code developed as part of the following paper:
+ 
+-* ["Large-scale machine learning-based phenotyping significantly improves
+-genomic discovery for optic nerve head morphology"](https://doi.org/10.1016/j.ajhg.2021.05.004) (Alipanahi, Hormozdiari, Behsaz, Cosentino, McCaw *et al*., *AJHG*, 2021).
++*   ["Large-scale machine learning-based phenotyping significantly improves
++    genomic discovery for optic nerve head
++    morphology"](https://doi.org/10.1016/j.ajhg.2021.05.004) (Alipanahi,
++    Hormozdiari, Behsaz, Cosentino, McCaw *et al*., *AJHG*, 2021).
+ 
+ There are three pieces of functionality present in this repository:
+ 
+@@ -95,9 +97,9 @@ categories see
+ ```python
+ {
+     'glaucoma_gradability': {
+-        0: 'UNGRADABLE',
++        0: 'GRADABLE',
+         1: 'WITH_DIFFICULTY',
+-        2: 'GRADABLE',
++        2: 'UNGRADABLE',
+     },
+     'glaucoma_suspect_risk': {
+         0: 'NON_GLAUCOMATOUS',
+@@ -106,9 +108,9 @@ categories see
+         3: 'LIKELY',
+     },
+     'vertical_cd_visibility': {
+-        0: 'UNABLE_TO_ASSESS',
++        0: 'SUFFICIENT',
+         1: 'COMPROMISED',
+-        2: 'SUFFICIENT',
++        2: 'UNABLE_TO_ASSESS',
+     },
+ }
+ ```
+@@ -119,8 +121,8 @@ Note: The pipeline assumes that train, validation, test, and prediction
+ ```python
+ config.dataset = ml_collections.ConfigDict({
+     'train': '/mnt/disks/data/train/train.tfrecord*',
+-    'eval': '/mnt/disks/data/train/eval.tfrecord*',
+-    'test': '/mnt/disks/data/train/test.tfrecord*',
++    'eval': '/mnt/disks/data/eval/eval.tfrecord*',
++    'test': '/mnt/disks/data/test/test.tfrecord*',
+     'predict': '/mnt/disks/data/predict/predict.tfrecord*',
+     ...
+ })
+@@ -261,8 +263,8 @@ image_id,glaucoma_gradability:UNGRADABLE,glaucoma_gradability:WITH_DIFFICULTY,gl
+ 
+ Individuals interested in performing inference on fundus images with the model
+ used to generate results in Alipanahi *et al.* for the purposes of scientific
+-reproducibility or generalizability of the work should email cym@google.com
+-for details.
++reproducibility or generalizability of the work should email cym@google.com for
++details.
+ 
+ ## Data analysis and figure generation
+ 
+@@ -396,6 +398,7 @@ The code used for plotting figures in the manuscript is in the
+ 
+ ## GWAS summary statistics
+ 
+-* VCDR: [click here (.gz)](https://drive.google.com/file/d/1KjlF9hvAn_g_Lm7D13Su1UD6qJpBIQ2z/view?usp=sharing).
+-* Glaucoma referral probability adjusted for VCDR: [click here
+-(.gz)](https://drive.google.com/file/d/1cWLVMDFr8ijS-SVSGQKRYFdre72y13WX/view?usp=sharing).
++*   VCDR:
++    [click here (.gz)](https://drive.google.com/file/d/1KjlF9hvAn_g_Lm7D13Su1UD6qJpBIQ2z/view?usp=sharing).
++*   Glaucoma referral probability adjusted for VCDR:
++    [click here (.gz)](https://drive.google.com/file/d/1cWLVMDFr8ijS-SVSGQKRYFdre72y13WX/view?usp=sharing).
+diff --git a/ml-based-vcdr/learning/callback_utils.py b/ml-based-vcdr/learning/callback_utils.py
+new file mode 100644
+index 0000000..9372f65
+--- /dev/null
++++ b/ml-based-vcdr/learning/callback_utils.py
+@@ -0,0 +1,191 @@
++# Copyright 2021 Google LLC.
++#
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions are met:
++#
++# 1. Redistributions of source code must retain the above copyright notice, this
++#    list of conditions and the following disclaimer.
++#
++# 2. Redistributions in binary form must reproduce the above copyright notice,
++#    this list of conditions and the following disclaimer in the documentation
++#    and/or other materials provided with the distribution.
++#
++# 3. Neither the name of the copyright holder nor the names of its contributors
++#    may be used to endorse or promote products derived from this software
++#    without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
++# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
++# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
++# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++"""Utilities for defining tensorflow keras callbacks."""
++import pathlib
++from typing import Dict, List
++
++import ml_collections
++import tensorflow as tf
++import tensorflow_addons as tfa
++
++# The prefix prepended to validation metrics and losses by tensorflow keras.
++_VAL_PREFIX = 'val'
++
++# The suffix appended to validation losses by tensorflow keras.
++_LOSS_SUFFIX = 'loss'
++
++# The base validation loss created by tensorflow keras.
++_VAL_LOSS = f'{_VAL_PREFIX}_{_LOSS_SUFFIX}'
++
++
++def get_checkpoint_dirs(
++    base_checkpoint_dir: pathlib.Path,
++    config: ml_collections.ConfigDict,
++) -> Dict[str, pathlib.Path]:
++  """Returns a mapping of metric to checkpoint directories for the given config.
++
++  If a single metric is specified using `config.callbacks.checkpoint_monitor`,
++  we monitor and checkpoint for only that metric. If `checkpoint_monitor` is not
++  specified, we monitor and checkpoint for each individual outcome as well as
++  the global `val_loss`.
++
++  Args:
++    base_checkpoint_dir: The base checkpoint directory.
++    config: The experimental configuration.
++
++  Returns:
++    A mapping of validation outcome names to checkpoint directories.
++  """
++  callbacks_config = config.get('callbacks', {})
++  checkpoint_monitor = callbacks_config.get('checkpoint_monitor', None)
++  if checkpoint_monitor is not None:
++    return {checkpoint_monitor: base_checkpoint_dir / checkpoint_monitor}
++
++  checkpoint_dirs = {_VAL_LOSS: base_checkpoint_dir / _VAL_LOSS}
++  for outcome in config.outcomes:
++    val_outcome_name = f'{_VAL_PREFIX}_{outcome.name}_{_LOSS_SUFFIX}'
++    if val_outcome_name in checkpoint_dirs:
++      raise ValueError(
++          f'Cannot checkpoint duplicate outcome name: {val_outcome_name!r}')
++    checkpoint_dirs[val_outcome_name] = base_checkpoint_dir / val_outcome_name
++
++  return checkpoint_dirs
++
++
++def _get_checkpoint_callbacks_for_metric(
++    checkpoint_monitor: str,
++    checkpoint_dir: pathlib.Path,
++    use_model_averaging: bool,
++    update_model_averaging_weights: bool,
++) -> List[tf.keras.callbacks.Callback]:
++  """Returns the list of checkpoint callbacks for a given metric.
++
++  Args:
++    checkpoint_monitor: The value monitored by the checkpoint callback.
++    checkpoint_dir: The directory in which checkpoints are written.
++    use_model_averaging: Whether checkpoints use model averaging; see
++      tfa.callbacks.AverageModelCheckpoint for details.
++    update_model_averaging_weights: Whether model weights are updated with the
++      running model average. If `False` when using model averaging, a second
++      checkpoint callback is included to save unaveraged model weights.
++
++  Returns:
++    A list of checkpoint callbacks for the given `checkpoint_monitor` metric.
++  """
++  checkpoint_file = checkpoint_dir / 'weights.best.ckpt'
++  checkpoint_file_avg = checkpoint_dir / 'weights.avg.best.ckpt'
++
++  checkpoint_callbacks = []
++  if use_model_averaging:
++    checkpoint_callbacks.append(
++        tfa.callbacks.AverageModelCheckpoint(
++            filepath=str(checkpoint_file_avg),
++            update_weights=update_model_averaging_weights,
++            save_best_only=True,
++            save_weights_only=True,
++            monitor=checkpoint_monitor,
++            mode='auto',
++            save_freq='epoch'))
++
++    # If not updating model weights to include variable averages, checkpoint
++    # both the standard and averaged model.
++    if not update_model_averaging_weights:
++      checkpoint_callbacks.append(
++          tf.keras.callbacks.ModelCheckpoint(
++              filepath=checkpoint_file,
++              save_best_only=True,
++              save_weights_only=True,
++              monitor=checkpoint_monitor,
++              mode='auto',
++              save_freq='epoch'))
++
++  else:
++    checkpoint_callbacks.append(
++        tf.keras.callbacks.ModelCheckpoint(
++            filepath=checkpoint_file,
++            save_best_only=True,
++            save_weights_only=True,
++            monitor=checkpoint_monitor,
++            mode='auto',
++            save_freq='epoch'))
++
++  return checkpoint_callbacks
++
++
++def _get_checkpoint_callbacks(
++    workdir: pathlib.Path,
++    config: ml_collections.ConfigDict,
++) -> List[tf.keras.callbacks.Callback]:
++  """Builds and returns a list of tensorflow callbacks for checkpointing.
++
++  If a single metric is specified using `config.callbacks.checkpoint_monitor`,
++  we monitor and checkpoint for only that metric. If `checkpoint_monitor` is not
++  specified, we monitor and checkpoint for each individual outcome as well as
++  the global `val_loss`.
++
++  Args:
++    workdir: The directory where logs and checkpoints are saved.
++    config: The experimental configuration.
++
++  Returns:
++    A list of tensorflow callbacks for checkpointing.
++  """
++  base_checkpoint_dir = workdir / 'checkpoints'
++  use_model_averaging = config.opt.use_model_averaging
++  updated_weights = config.opt.get('update_model_averaging_weights', True)
++
++  checkpoint_callbacks = []
++  checkpoint_dirs = get_checkpoint_dirs(base_checkpoint_dir, config)
++  for checkpoint_monitor, checkpoint_dir in checkpoint_dirs.items():
++    checkpoint_callbacks.extend(
++        _get_checkpoint_callbacks_for_metric(
++            checkpoint_monitor,
++            checkpoint_dir,
++            use_model_averaging,
++            updated_weights,
++        ))
++  return checkpoint_callbacks
++
++
++def get_callbacks(
++    workdir: pathlib.Path,
++    config: ml_collections.ConfigDict,
++) -> List[tf.keras.callbacks.Callback]:
++  """Builds and returns a list of tensorflow callbacks for use in training.
++
++  Args:
++    workdir: The directory where logs and checkpoints are saved.
++    config: The experimental configuration.
++
++  Returns:
++    A list of tensorflow callbacks for TensorBoard and checkpointing.
++  """
++  callbacks = [
++      tf.keras.callbacks.TensorBoard(log_dir=workdir / 'logs'),
++      *_get_checkpoint_callbacks(workdir, config),
++  ]
++  return callbacks
+diff --git a/ml-based-vcdr/learning/configs/base.py b/ml-based-vcdr/learning/configs/base.py
+index 904528e..b05205a 100644
+--- a/ml-based-vcdr/learning/configs/base.py
++++ b/ml-based-vcdr/learning/configs/base.py
+@@ -50,7 +50,7 @@ def get_config() -> ml_collections.ConfigDict:
+       'eval': '/mnt/disks/data/train/eval.tfrecord*',
+       'test': '/mnt/disks/data/train/test.tfrecord*',
+       'predict': '/mnt/disks/data/predict/predict.tfrecord*',
+-      'num_train_examples': 79355,
++      'num_train_examples': 122944,
+       'batch_size': 16,
+       'image_size': (587, 587),
+       'random_horizontal_flip': True,
+@@ -92,6 +92,13 @@ def get_config() -> ml_collections.ConfigDict:
+       'staircase': True,
+   })
+ 
++  config.callbacks = ml_collections.ConfigDict({
++      # 'checkpoint_monitor' is set to an empty placeholder so that it can be
++      # overridden by the `ml_collections.config_flags` library. For example:
++      # `--config.callbacks.checkpoint_monitor="val_loss"`.
++      'checkpoint_monitor': ml_collections.config_dict.placeholder(str),
++  })
++
+   config.outcomes = [
+       ml_collections.ConfigDict({
+           'name': 'vertical_cup_to_disc',
+diff --git a/ml-based-vcdr/learning/configs/base_epicnf.py b/ml-based-vcdr/learning/configs/base_epicnf.py
+new file mode 100644
+index 0000000..461da2e
+--- /dev/null
++++ b/ml-based-vcdr/learning/configs/base_epicnf.py
+@@ -0,0 +1,147 @@
++# Copyright 2021 Google LLC.
++#
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions are met:
++#
++# 1. Redistributions of source code must retain the above copyright notice, this
++#    list of conditions and the following disclaimer.
++#
++# 2. Redistributions in binary form must reproduce the above copyright notice,
++#    this list of conditions and the following disclaimer in the documentation
++#    and/or other materials provided with the distribution.
++#
++# 3. Neither the name of the copyright holder nor the names of its contributors
++#    may be used to endorse or promote products derived from this software
++#    without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
++# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
++# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
++# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++"""Contains the default training configuration."""
++import ml_collections
++
++
++def get_config() -> ml_collections.ConfigDict:
++  """Returns the default hyperparameter configuration."""
++  config = ml_collections.ConfigDict()
++
++  config.seed = 42
++
++  # misc. training
++  config.train = ml_collections.ConfigDict({
++      'use_mixed_precision': True,
++      'use_distributed_training': False,
++      'max_num_steps': 250000,
++      'log_step_freq': 500,
++      'fit_verbose': 1,
++      'initial_epoch': 0,
++  })
++
++  # dataset and augmentation
++  config.dataset = ml_collections.ConfigDict({
++      'train': '/mnt/disks/data/train/train.tfrecord*',
++      'eval': '/mnt/disks/data/train/eval.tfrecord*',
++      'test': '/mnt/disks/data/train/test.tfrecord*',
++      'predict': '/mnt/disks/data/predict/predict.tfrecord*',
++      'num_train_examples': 10426,
++      'batch_size': 16,
++      'image_size': (587, 587),
++      'random_horizontal_flip': True,
++      'random_vertical_flip': True,
++      'random_brightness_max_delta': 0.1147528,
++      'random_saturation_lower': 0.5597273,
++      'random_saturation_upper': 1.2748845,
++      'random_hue_max_delta': 0.0251488,
++      'random_contrast_lower': 0.9996807,
++      'random_contrast_upper': 1.7704824,
++      'use_cache': False,
++  })
++
++  # model architecture
++  config.model = ml_collections.ConfigDict({
++      'backbone': 'inceptionv3',
++      'backbone_drop_rate': 0.2,
++      'input_shape': (587, 587, 3),
++      'weights': 'imagenet',
++      'weight_decay': 0.00004,
++  })
++
++  # optimizer
++  config.opt = ml_collections.ConfigDict({
++      'optimizer': 'adam',
++      'learning_rate': 0.001,
++      'beta_1': 0.9,
++      'beta_2': 0.999,
++      'epsilon': 0.1,
++      'amsgrad': False,
++      'use_model_averaging': True,
++      'update_model_averaging_weights': False,
++  })
++
++  config.schedule = ml_collections.ConfigDict({
++      'schedule': 'exponential',
++      'epochs_per_decay': 2,
++      'decay_rate': 0.99,
++      'staircase': True,
++  })
++
++  config.callbacks = ml_collections.ConfigDict({
++      # 'checkpoint_monitor' is set to an empty placeholder so that it can be
++      # overridden by the `ml_collections.config_flags` library. For example:
++      # `--config.callbacks.checkpoint_monitor="val_loss"`.
++      'checkpoint_monitor': ml_collections.config_dict.placeholder(str),
++  })
++
++  config.outcomes = [
++      ml_collections.ConfigDict({
++          'name': 'alt1_cup_area',
++          'type': 'regression',
++          'num_classes': 1,
++          'loss': 'mse',
++          'loss_weight': 1.0,
++      }),
++      ml_collections.ConfigDict({
++          'name': 'alt1_disc_area',
++          'type': 'regression',
++          'num_classes': 1,
++          'loss': 'mse',
++          'loss_weight': 1.0,
++      }),
++      ml_collections.ConfigDict({
++          'name': 'alt1_rim_area',
++          'type': 'regression',
++          'num_classes': 1,
++          'loss': 'mse',
++          'loss_weight': 1.0,
++      }),
++      ml_collections.ConfigDict({
++          'name': 'h_vertical_cup_disk_ratio',
++          'type': 'regression',
++          'num_classes': 1,
++          'loss': 'mse',
++          'loss_weight': 1.0,
++      }),
++      ml_collections.ConfigDict({
++          'name': 'h_linear_cup_disk_ratio',
++          'type': 'regression',
++          'num_classes': 1,
++          'loss': 'mse',
++          'loss_weight': 1.0,
++      }),
++      ml_collections.ConfigDict({
++          'name': 'ml_vcdr',
++          'type': 'regression',
++          'num_classes': 1,
++          'loss': 'mse',
++          'loss_weight': 1.0,
++      }),
++  ]
++
++  return config
+diff --git a/ml-based-vcdr/learning/configs/base_ukb_distill.py b/ml-based-vcdr/learning/configs/base_ukb_distill.py
+new file mode 100644
+index 0000000..cb079fd
+--- /dev/null
++++ b/ml-based-vcdr/learning/configs/base_ukb_distill.py
+@@ -0,0 +1,137 @@
++# Copyright 2021 Google LLC.
++#
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions are met:
++#
++# 1. Redistributions of source code must retain the above copyright notice, this
++#    list of conditions and the following disclaimer.
++#
++# 2. Redistributions in binary form must reproduce the above copyright notice,
++#    this list of conditions and the following disclaimer in the documentation
++#    and/or other materials provided with the distribution.
++#
++# 3. Neither the name of the copyright holder nor the names of its contributors
++#    may be used to endorse or promote products derived from this software
++#    without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
++# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
++# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
++# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++"""Contains the default training configuration."""
++import ml_collections
++
++
++def get_config() -> ml_collections.ConfigDict:
++  """Returns the default hyperparameter configuration."""
++  config = ml_collections.ConfigDict()
++
++  config.seed = None
++
++  # misc. training
++  config.train = ml_collections.ConfigDict({
++      'use_mixed_precision': True,
++      'use_distributed_training': False,
++      'max_num_steps': 250000,
++      'log_step_freq': 500,
++      'fit_verbose': 1,
++      'initial_epoch': 0,
++  })
++
++  # dataset and augmentation
++  config.dataset = ml_collections.ConfigDict({
++      'train': '/mnt/disks/data/train/train.tfrecord*',
++      'eval': '/mnt/disks/data/train/eval.tfrecord*',
++      'test': '/mnt/disks/data/train/test.tfrecord*',
++      'predict': '/mnt/disks/data/predict/predict.tfrecord*',
++      'num_train_examples': 122944,
++      'batch_size': 16,
++      'image_size': (587, 587),
++      'random_horizontal_flip': True,
++      'random_vertical_flip': True,
++      'random_brightness_max_delta': 0.1147528,
++      'random_saturation_lower': 0.5597273,
++      'random_saturation_upper': 1.2748845,
++      'random_hue_max_delta': 0.0251488,
++      'random_contrast_lower': 0.9996807,
++      'random_contrast_upper': 1.7704824,
++      'use_cache': False,
++  })
++
++  # model architecture
++  config.model = ml_collections.ConfigDict({
++      'backbone': 'inceptionv3',
++      'backbone_drop_rate': 0.2,
++      'input_shape': (587, 587, 3),
++      'weights': 'imagenet',
++      'weight_decay': 0.00004,
++  })
++
++  # optimizer
++  config.opt = ml_collections.ConfigDict({
++      'optimizer': 'adam',
++      'learning_rate': 0.001,
++      'beta_1': 0.9,
++      'beta_2': 0.999,
++      'epsilon': 0.1,
++      'amsgrad': False,
++      'use_model_averaging': True,
++      'update_model_averaging_weights': False,
++  })
++
++  config.schedule = ml_collections.ConfigDict({
++      'schedule': 'exponential',
++      'epochs_per_decay': 2,
++      'decay_rate': 0.99,
++      'staircase': True,
++  })
++
++  config.callbacks = ml_collections.ConfigDict({
++      'checkpoint_monitor': 'val_loss',
++  })
++
++  config.outcomes = [
++      ml_collections.ConfigDict({
++          'name': 'vertical_cup_to_disc',
++          'type': 'regression',
++          'num_classes': 1,
++          'loss': 'mse',
++          'loss_weight': 1.0,
++      }),
++      ml_collections.ConfigDict({
++          'name': 'vertical_cd_visibility',
++          'type': 'classification',
++          'num_classes': 3,
++          'loss': 'ce',
++          'loss_weight': 1.0,
++      }),
++      ml_collections.ConfigDict({
++          'name': 'glaucoma_suspect_risk',
++          'type': 'classification',
++          'num_classes': 4,
++          'loss': 'ce',
++          'loss_weight': 1.0,
++      }),
++      ml_collections.ConfigDict({
++          'name': 'glaucoma_gradability',
++          'type': 'classification',
++          'num_classes': 3,
++          'loss': 'ce',
++          'loss_weight': 1.0,
++      }),
++      ml_collections.ConfigDict({
++          'name': 'eye_position',
++          'type': 'classification',
++          'num_classes': 2,
++          'loss': 'ce',
++          'loss_weight': 1.0,
++      }),
++  ]
++
++  return config
+diff --git a/ml-based-vcdr/learning/input_pipeline.py b/ml-based-vcdr/learning/input_pipeline.py
+index 290f277..792ecf1 100644
+--- a/ml-based-vcdr/learning/input_pipeline.py
++++ b/ml-based-vcdr/learning/input_pipeline.py
+@@ -336,7 +336,7 @@ def build_dataset(split: Split,
+   ds = ds.map(_resize_and_center, num_parallel_calls=tf.data.AUTOTUNE)
+   if shuffle:
+     ds = ds.shuffle(shuffle_buffer)
+-  ds = ds.batch(dataset_config.batch_size, drop_remainder=True)
++  ds = ds.batch(dataset_config.batch_size)
+   if repeat:
+     ds = ds.repeat()
+   ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
+diff --git a/ml-based-vcdr/learning/predict.py b/ml-based-vcdr/learning/predict.py
+index 3e7ecc3..f01cad4 100644
+--- a/ml-based-vcdr/learning/predict.py
++++ b/ml-based-vcdr/learning/predict.py
+@@ -32,25 +32,27 @@ classification and regression target, i.e., a multiclass outcome of shape
+ `(None, N)` will have `N` columns. See `predict_utils.OUTCOME_COLUMN_MAP` for
+ column mapping.
+ 
+-This script should be run with the same `workdir` and `config` used in training.
++This script should be run with the same `checkpoint_dir` and `config` used in
++training.
+ 
+ Note: If generating predictions with a single member of an ensemble trained
+-using the `train_ensemble.py` script, the provided workdir should correspond to
+-the member's subdirectory, e.g., `base_workdir/member_{i}`.
++using the `train_ensemble.py` script, the provided checkpoint_dir should
++correspond to the member's subdirectory, e.g.,
++`base_workdir/member_{i}/{checkpoint_dir}`.
+ 
+ Example usages:
+ 
+ # Generating predictions with a single model trained using `train.py`:
+ $ python3 predict.py \
+     --config=configs/base.py \
+-    --workdir=./reproduce_vcdr \
++    --checkpoint_dir=./vcdr/checkpoints/val_loss \
+     --output_filepath=./outcome_predictions.csv
+ 
+ # Generating predictions with an ensemble member trained using
+ # `train_ensemble.py`:
+ $ python3 predict.py \
+     --config=configs/base.py \
+-    --workdir=./reproduce_vcdr_ensemble_base/member_9 \
++    --checkpoint_dir=./vcdr_ensemble_base/member_9/checkpoints/val_loss \
+     --output_filepath=./outcome_predictions.csv
+ """
+ import pathlib
+@@ -71,13 +73,13 @@ config_flags.DEFINE_config_file(
+     None,
+     'A resource path to the ConfigDict used during training.',
+     lock_config=True)
+-flags.DEFINE_string('workdir', None, 'The `workdir` used during training')
++flags.DEFINE_string('checkpoint_dir', None, 'The checkpoint directory')
+ flags.DEFINE_string('output_filepath', 'predictions.csv',
+                     'The filepath at which the output CSV is written.')
+ 
+ 
+ def predict(
+-    workdir: pathlib.Path,
++    checkpoint_dir: pathlib.Path,
+     config: ml_collections.ConfigDict,
+     output_filepath: str,
+ ) -> None:
+@@ -91,7 +93,7 @@ def predict(
+ 
+   # Load the best checkpoint
+   config, model = model_utils.get_model(config)
+-  best_checkpoint = tf.train.latest_checkpoint(workdir / 'checkpoints')
++  best_checkpoint = tf.train.latest_checkpoint(checkpoint_dir)
+   print(f'Loading model from {best_checkpoint}...')
+   model.load_weights(best_checkpoint).expect_partial()
+ 
+@@ -113,11 +115,11 @@ def main(unused_argv):
+   print('Generating predictions with the following config:')
+   print(FLAGS.config)
+   predict(
+-      workdir=pathlib.Path(FLAGS.workdir),
++      checkpoint_dir=pathlib.Path(FLAGS.checkpoint_dir),
+       config=FLAGS.config,
+       output_filepath=FLAGS.output_filepath)
+ 
+ 
+ if __name__ == '__main__':
+-  flags.mark_flags_as_required(['config', 'workdir'])
++  flags.mark_flags_as_required(['config', 'checkpoint_dir'])
+   app.run(main)
+diff --git a/ml-based-vcdr/learning/predict_utils.py b/ml-based-vcdr/learning/predict_utils.py
+index d40df74..78848b1 100644
+--- a/ml-based-vcdr/learning/predict_utils.py
++++ b/ml-based-vcdr/learning/predict_utils.py
+@@ -24,8 +24,7 @@
+ # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-r"""Utilities for generating model predictions."""
+-import collections
++"""Utilities for generating model predictions."""
+ from typing import Dict, List
+ 
+ import numpy as np
+@@ -39,13 +38,13 @@ ID_KEY = 'id'
+ # `OUTCOME_COLUMN_MAP['glaucoma_gradability'][1]` corresponds to the second
+ # multi-class target of the model's 'glaucoma_gradability' head.
+ OUTCOME_COLUMN_MAP = {
+-    'id': {
++    ID_KEY: {
+         0: 'image_id'
+     },
+     'glaucoma_gradability': {
+-        0: 'glaucoma_gradability:UNGRADABLE',
++        0: 'glaucoma_gradability:GRADABLE',
+         1: 'glaucoma_gradability:WITH_DIFFICULTY',
+-        2: 'glaucoma_gradability:GRADABLE',
++        2: 'glaucoma_gradability:UNGRADABLE',
+     },
+     'glaucoma_suspect_risk': {
+         0: 'glaucoma_suspect_risk:NON_GLAUCOMATOUS',
+@@ -54,13 +53,72 @@ OUTCOME_COLUMN_MAP = {
+         3: 'glaucoma_suspect_risk:LIKELY',
+     },
+     'vertical_cd_visibility': {
+-        0: 'vertical_cd_visibility:UNABLE_TO_ASSESS',
++        0: 'vertical_cd_visibility:SUFFICIENT',
+         1: 'vertical_cd_visibility:COMPROMISED',
+-        2: 'vertical_cd_visibility:SUFFICIENT',
++        2: 'vertical_cd_visibility:UNABLE_TO_ASSESS',
+     },
+     'vertical_cup_to_disc': {
+-        0: 'vertical_cup_to_disc:VERTICAL_CUP_TO_DISC'
+-    }
++        0: 'vertical_cup_to_disc:VERTICAL_CUP_TO_DISC',
++    },
++    'eye_position': {
++        0: 'eye_position:LEFT',
++        1: 'eye_position:RIGHT',
++    },
++    'gr_cdr': {
++        0: 'gr_cdr:GR_CDR'
++    },
++    'gr_cup': {
++        0: 'gr_cup:GR_CUP'
++    },
++    'gr_disc': {
++        0: 'gr_disc:GR_DISC'
++    },
++    'gr_vcdr': {
++        0: 'gr_vcdr:GR_VCDR'
++    },
++    'h_cup_area': {
++        0: 'h_cup_area:H_CUP_AREA'
++    },
++    'h_cup_disc_area_ratio': {
++        0: 'h_cup_disc_area_ratio:H_CUP_DISC_AREA_RATIO'
++    },
++    'h_disc_area': {
++        0: 'h_disc_area:H_DISC_AREA'
++    },
++    'h_horizontal_cup_disk_ratio': {
++        0: 'h_horizontal_cup_disk_ratio:H_HORIZONTAL_CUP_DISK_RATIO'
++    },
++    'h_linear_cup_disk_ratio': {
++        0: 'h_linear_cup_disk_ratio:H_LINEAR_CUP_DISK_RATIO'
++    },
++    'h_mean_cup_depth': {
++        0: 'h_mean_cup_depth:H_MEAN_CUP_DEPTH'
++    },
++    'h_rim_area': {
++        0: 'h_rim_area:H_RIM_AREA'
++    },
++    'h_rim_disc_area_ratio': {
++        0: 'h_rim_disc_area_ratio:H_RIM_DISC_AREA_RATIO'
++    },
++    'h_vertical_cup_disk_ratio': {
++        0: 'h_vertical_cup_disk_ratio:H_VERTICAL_CUP_DISK_RATIO'
++    },
++    'ml_vcdr': {
++        0: 'ml_vcdr:ML_VCDR'
++    },
++    'any_gl_or_sus': {
++        0: 'any_gl_or_sus:0',
++        1: 'any_gl_or_sus:1',
++    },
++    'alt1_cup_area': {
++        0: 'alt1_cup_area:ALT1_CUP_AREA'
++    },
++    'alt1_disc_area': {
++        0: 'alt1_disc_area:ALT1_DISC_AREA'
++    },
++    'alt1_rim_area': {
++        0: 'alt1_rim_area:ALT1_RIM_AREA'
++    },
+ }
+ 
+ 
+@@ -77,21 +135,26 @@ def generate_predictions(
+       stateful_metrics=None,
+       unit_name='step')
+ 
+-  # Build the list of mode outputs.
++  # Iterate over the dataset, accumulating model predictions for each outcome.
++  # Note: "output_names" is a public attribute of `tf.keras.Model` and denotes a
++  # list of string names for model outputs. The order of "output_names"
++  # corresponds to the order of output tensors returned by `model()`.
+   output_names = model.output_names.copy()
+-  output_names.append(ID_KEY)
+-
+-  # Predict outcomes for all examples and build a dictionary of output arrays.
+-  batched_predictions = collections.defaultdict(list)
+-  for (inputs_batch, _, _) in predict_ds:
+-    predict_batch = model.predict_on_batch(inputs_batch)
+-    predict_batch.append(inputs_batch[ID_KEY].numpy())
+-    for output_name, ndarray in zip(output_names, predict_batch):
+-      batched_predictions[output_name].append(ndarray)
++  is_single_headed = len(output_names) == 1
++  predict_dict = {name: [] for name in [ID_KEY] + output_names}
++  for batch_input, _, _ in predict_ds:
++    predict_dict[ID_KEY].append(batch_input[ID_KEY].numpy())
++    # Note: this check is required since a multi-headed TensorFlow model returns
++    # a list of output tensors while a single-headed model returns a single
++    # output tensor (rather than a list of size 1).
++    model_output = model(batch_input)
++    if is_single_headed:
++      predict_dict[output_names[0]].append(model_output.numpy())
++    else:
++      for name, output_tensor in zip(output_names, model_output):
++        predict_dict[name].append(output_tensor.numpy())
+     progbar.add(1)
+-  print()
+-
+-  return batched_predictions
++  return predict_dict
+ 
+ 
+ def merge_batched_predictions(
+diff --git a/ml-based-vcdr/learning/save_model.py b/ml-based-vcdr/learning/save_model.py
+new file mode 100644
+index 0000000..a136831
+--- /dev/null
++++ b/ml-based-vcdr/learning/save_model.py
+@@ -0,0 +1,110 @@
++# Copyright 2021 Google LLC.
++#
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions are met:
++#
++# 1. Redistributions of source code must retain the above copyright notice, this
++#    list of conditions and the following disclaimer.
++#
++# 2. Redistributions in binary form must reproduce the above copyright notice,
++#    this list of conditions and the following disclaimer in the documentation
++#    and/or other materials provided with the distribution.
++#
++# 3. Neither the name of the copyright holder nor the names of its contributors
++#    may be used to endorse or promote products derived from this software
++#    without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
++# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
++# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
++# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++r"""Script for generating predictions from a single model.
++
++Model predictions are written to a CSV with a unique `predict_utils.ID_KEY` ID
++column corresponding to each input image. The CSV contains a column for each
++classification and regression target, i.e., a multiclass outcome of shape
++`(None, N)` will have `N` columns. See `predict_utils.OUTCOME_COLUMN_MAP` for
++column mapping.
++
++This script should be run with the same `checkpoint_dir` and `config` used in
++training.
++
++Note: If generating predictions with a single member of an ensemble trained
++using the `train_ensemble.py` script, the provided checkpoint_dir should
++correspond to the member's subdirectory, e.g.,
++`base_workdir/member_{i}/{checkpoint_dir}`.
++
++Example usages:
++
++# Generating predictions with a single model trained using `train.py`:
++$ python3 predict.py \
++    --config=configs/base.py \
++    --checkpoint_dir=./vcdr/checkpoints/val_loss \
++    --output_filepath=./outcome_predictions.csv
++
++# Generating predictions with an ensemble member trained using
++# `train_ensemble.py`:
++$ python3 predict.py \
++    --config=configs/base.py \
++    --checkpoint_dir=./vcdr_ensemble_base/member_9/checkpoints/val_loss \
++    --output_filepath=./outcome_predictions.csv
++"""
++import pathlib
++
++from absl import app
++from absl import flags
++import ml_collections
++from ml_collections import config_flags
++import model_utils
++import tensorflow as tf
++
++FLAGS = flags.FLAGS
++
++config_flags.DEFINE_config_file(
++    'config',
++    None,
++    'A resource path to the ConfigDict used during training.',
++    lock_config=True,
++)
++flags.DEFINE_string('checkpoint_dir', None, 'The checkpoint directory')
++flags.DEFINE_string(
++    'output_filepath',
++    'predictions.csv',
++    'The filepath at which the output CSV is written.',
++)
++
++
++def save(
++    checkpoint_dir: pathlib.Path,
++    config: ml_collections.ConfigDict,
++    output_filepath: str,
++) -> None:
++  """Generates model predictions using the best available checkpoint."""
++  # Load the best checkpoint
++  _, model = model_utils.get_model(config)
++  best_checkpoint = tf.train.latest_checkpoint(checkpoint_dir)
++  print(f'Loading model from {best_checkpoint}...')
++  model.load_weights(best_checkpoint).expect_partial()
++  #  model.save(checkpoint_dir / 'model.h6', include_optimizer=False)
++  model.save(checkpoint_dir / 'saved_model.keras', include_optimizer=False)
++
++
++def main(unused_argv):
++  print('Saving full model:')
++  print(FLAGS.config)
++  save(
++      checkpoint_dir=pathlib.Path(FLAGS.checkpoint_dir),
++      config=FLAGS.config,
++      output_filepath=FLAGS.output_filepath,
++  )
++
++
++if __name__ == '__main__':
++  flags.mark_flags_as_required(['config', 'checkpoint_dir'])
++  app.run(main)
+diff --git a/ml-based-vcdr/learning/train.py b/ml-based-vcdr/learning/train.py
+index b2fcc23..493238c 100644
+--- a/ml-based-vcdr/learning/train.py
++++ b/ml-based-vcdr/learning/train.py
+@@ -26,17 +26,16 @@
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ """Pipeline for training models."""
+ import pathlib
+-from typing import List
+ from typing import Tuple
+ 
+ from absl import app
+ from absl import flags
++import callback_utils
+ import input_pipeline
+ import ml_collections
+ from ml_collections import config_flags
+ import model_utils
+ import tensorflow as tf
+-import tensorflow_addons as tfa
+ 
+ FLAGS = flags.FLAGS
+ 
+@@ -49,62 +48,6 @@ config_flags.DEFINE_config_file(
+ flags.DEFINE_string('workdir', None, 'Working directory for the experiment.')
+ 
+ 
+-def get_callbacks(
+-    workdir: pathlib.Path,
+-    config: ml_collections.ConfigDict) -> List[tf.keras.callbacks.Callback]:
+-  """Builds and returns a list of tensorflow callbacks for use in training.
+-
+-  Args:
+-    workdir: The directory where logs and checkpoints are saved.
+-    config: The experimental configuration.
+-
+-  Returns:
+-    A list of tensorflow callbacks for TensorBoard and checkpointing.
+-  """
+-  log_dir = workdir / 'logs'
+-  checkpoint_dir = workdir / 'checkpoints'
+-  checkpoint_file = checkpoint_dir / 'weights.best.ckpt'
+-  checkpoint_file_avg = checkpoint_dir / 'weights.avg.best.ckpt'
+-
+-  callbacks = [tf.keras.callbacks.TensorBoard(log_dir=log_dir)]
+-
+-  if config.opt.use_model_averaging:
+-    update_weights = config.opt.get('update_model_averaging_weights', True)
+-    callbacks.append(
+-        tfa.callbacks.AverageModelCheckpoint(
+-            filepath=str(checkpoint_file_avg),
+-            update_weights=update_weights,
+-            save_best_only=True,
+-            save_weights_only=True,
+-            monitor='val_vertical_cup_to_disc_loss',
+-            mode='min',
+-            save_freq='epoch'))
+-
+-    # If not update model weights to include variable averages, checkpoint both
+-    # the standard and averaged model.
+-    if not update_weights:
+-      callbacks.append(
+-          tf.keras.callbacks.ModelCheckpoint(
+-              filepath=checkpoint_file,
+-              save_best_only=True,
+-              save_weights_only=True,
+-              monitor='val_vertical_cup_to_disc_loss',
+-              mode='min',
+-              save_freq='epoch'))
+-
+-  else:
+-    callbacks.append(
+-        tf.keras.callbacks.ModelCheckpoint(
+-            filepath=checkpoint_file,
+-            save_best_only=True,
+-            save_weights_only=True,
+-            monitor='val_vertical_cup_to_disc_loss',
+-            mode='min',
+-            save_freq='epoch'))
+-
+-  return callbacks
+-
+-
+ def get_datasets(
+     config: ml_collections.ConfigDict,
+ ) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
+@@ -151,7 +94,7 @@ def train(
+       epochs=num_log_epochs,
+       initial_epoch=config.train.get('initial_epoch', 0),
+       steps_per_epoch=config.train.log_step_freq,
+-      callbacks=get_callbacks(workdir, config),
++      callbacks=callback_utils.get_callbacks(workdir, config),
+       verbose=verbose,
+   )
+ 
+-- 
+2.17.1
+
